@@ -1,66 +1,67 @@
 package tech.sethi.pebbles.crates.screenhandlers.admin.crateconfig
 
-import com.google.gson.GsonBuilder
-import net.minecraft.component.DataComponentTypes
-import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.inventory.SimpleInventory
-import net.minecraft.item.ItemStack
-import net.minecraft.item.Items
-import net.minecraft.registry.DynamicRegistryManager
-import net.minecraft.screen.GenericContainerScreenHandler
-import net.minecraft.screen.ScreenHandlerType
-import net.minecraft.screen.SimpleNamedScreenHandlerFactory
-import net.minecraft.screen.slot.SlotActionType
-import net.minecraft.text.Text
-import net.minecraft.util.Formatting
+import net.minecraft.ChatFormatting
+import net.minecraft.core.RegistryAccess
+import net.minecraft.core.component.DataComponents
+import net.minecraft.network.chat.Component
+import net.minecraft.world.SimpleContainer
+import net.minecraft.world.SimpleMenuProvider
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.inventory.ChestMenu
+import net.minecraft.world.inventory.ClickType
+import net.minecraft.world.inventory.MenuType
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
+import net.neoforged.neoforge.server.permission.PermissionAPI
 import tech.sethi.pebbles.crates.lootcrates.CrateConfigManager
 import tech.sethi.pebbles.crates.lootcrates.CrateTransformer
 import tech.sethi.pebbles.crates.screenhandlers.admin.cratelist.CrateListScreenHandler
 
 class CrateConfigScreenHandler(
-    syncId: Int, player: PlayerEntity, crateName: String
-) : GenericContainerScreenHandler(ScreenHandlerType.GENERIC_9X3, syncId, player.inventory, SimpleInventory(9 * 3), 3) {
+    syncId: Int, player: Player, crateName: String
+) : ChestMenu(MenuType.GENERIC_9x3, syncId, player.inventory, SimpleContainer(9 * 3), 3) {
 
     init {
-        val inventory = inventory
-        for (i in 0 until inventory.size()) {
-            inventory.setStack(i,
-                ItemStack(Items.GRAY_STAINED_GLASS_PANE).apply { set(DataComponentTypes.CUSTOM_NAME, Text.of("")) })
+        val inventory = container
+        for (i in 0 until inventory.containerSize) {
+            inventory.setItem(i,
+                ItemStack(Items.GRAY_STAINED_GLASS_PANE).apply { set(DataComponents.CUSTOM_NAME, Component.literal("")) })
         }
 
-        inventory.setStack(12, ItemStack(Items.PAPER).apply {
+        inventory.setItem(12, ItemStack(Items.PAPER).apply {
             set(
-                DataComponentTypes.CUSTOM_NAME, Text.literal("Get Crate").formatted(Formatting.GOLD)
+                DataComponents.CUSTOM_NAME, Component.literal("Get Crate").withStyle(ChatFormatting.GOLD)
             )
         })
 
-        inventory.setStack(13, ItemStack(Items.TRIPWIRE_HOOK).apply {
-            set(DataComponentTypes.CUSTOM_NAME, Text.literal("Get Key").formatted(Formatting.GOLD))
+        inventory.setItem(13, ItemStack(Items.TRIPWIRE_HOOK).apply {
+            set(DataComponents.CUSTOM_NAME, Component.literal("Get Key").withStyle(ChatFormatting.GOLD))
         })
 
-        inventory.setStack(14, ItemStack(Items.ITEM_FRAME).apply {
+        inventory.setItem(14, ItemStack(Items.ITEM_FRAME).apply {
             set(
-                DataComponentTypes.CUSTOM_NAME, Text.literal("Configure Prize (Web Editor)").formatted(Formatting.GOLD)
+                DataComponents.CUSTOM_NAME, Component.literal("Configure Prize (Web Editor)").withStyle(ChatFormatting.GOLD)
             )
         })
 
-        inventory.setStack(18, ItemStack(Items.ARROW).apply {
-            set(DataComponentTypes.CUSTOM_NAME, Text.literal("Back").formatted(Formatting.RED))
+        inventory.setItem(18, ItemStack(Items.ARROW).apply {
+            set(DataComponents.CUSTOM_NAME, Component.literal("Back").withStyle(ChatFormatting.RED))
         })
     }
 
     val crateConfigManager = CrateConfigManager
     val crateConfig = crateConfigManager.getCrateConfig(crateName)
-    override fun onSlotClick(slotIndex: Int, button: Int, actionType: SlotActionType?, player: PlayerEntity?) {
-        if (actionType == SlotActionType.THROW || actionType == SlotActionType.CLONE || actionType == SlotActionType.SWAP || actionType == SlotActionType.PICKUP_ALL) {
+
+    override fun clicked(slotIndex: Int, button: Int, actionType: ClickType, player: Player) {
+        if (actionType == ClickType.THROW || actionType == ClickType.CLONE || actionType == ClickType.SWAP || actionType == ClickType.PICKUP_ALL) {
             return
         }
 
         val crateTransformer = CrateTransformer(crateConfig!!.crateName, player!!)
         if (slotIndex == 18) {
-            player.openHandledScreen(SimpleNamedScreenHandlerFactory({ syncId, _, p ->
+            player.openMenu(SimpleMenuProvider({ syncId, _, p ->
                 CrateListScreenHandler(syncId, p)
-            }, Text.literal("Crate Management")))
+            }, Component.literal("Crate Management")))
         }
 
         if (slotIndex == 12) {
@@ -73,16 +74,15 @@ class CrateConfigScreenHandler(
 
         if (slotIndex == 14) {
             val url = "https://pebblescrate.sethi.tech/"
-            val clickableLink =
-                Text.Serialization.fromJson(("{\"text\":\"$url\",\"clickEvent\":{\"action\":\"open_url\",\"value\":\"$url\"}}"), DynamicRegistryManager.EMPTY)
-            player.sendMessage(
-                Text.literal("To edit the config on the web UI, navigate to: ").formatted(Formatting.GOLD)
+            val clickableLink = Component.Serializer.fromJson(("{\"text\":\"$url\",\"clickEvent\":{\"action\":\"open_url\",\"value\":\"$url\"}}"), RegistryAccess.EMPTY) as Component
+            player.displayClientMessage(
+                Component.literal("To edit the config on the web UI, navigate to: ").withStyle(ChatFormatting.GOLD)
                     .append(clickableLink), false
             )
         }
     }
 
-    override fun canUse(player: PlayerEntity): Boolean {
+    override fun stillValid(arg: Player): Boolean {
         return true
     }
 

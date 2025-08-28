@@ -3,7 +3,7 @@ package tech.sethi.pebbles.crates.lootcrates
 import ItemStackTypeAdapter
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.ItemStack
 import java.io.File
 
 object CrateConfigManager {

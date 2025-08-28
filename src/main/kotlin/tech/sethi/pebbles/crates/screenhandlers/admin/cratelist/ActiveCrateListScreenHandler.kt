@@ -1,25 +1,19 @@
 package tech.sethi.pebbles.crates.screenhandlers.admin.cratelist
 
-import net.minecraft.component.DataComponentTypes
-import net.minecraft.enchantment.Enchantments
-import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.inventory.SimpleInventory
-import net.minecraft.registry.RegistryKeys
-import net.minecraft.registry.entry.RegistryEntry
-import net.minecraft.screen.GenericContainerScreenHandler
-import net.minecraft.screen.ScreenHandlerType
-import net.minecraft.screen.SimpleNamedScreenHandlerFactory
-import net.minecraft.screen.slot.SlotActionType
-import net.minecraft.text.Text
-import net.minecraft.util.math.BlockPos
+import net.minecraft.core.component.DataComponents
+import net.minecraft.core.registries.Registries
+import net.minecraft.network.chat.Component
+import net.minecraft.world.SimpleContainer
+import net.minecraft.world.SimpleMenuProvider
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.inventory.ChestMenu
+import net.minecraft.world.inventory.ClickType
+import net.minecraft.world.inventory.MenuType
+import net.minecraft.world.item.enchantment.Enchantments
 import tech.sethi.pebbles.crates.PebblesCrate
 import tech.sethi.pebbles.crates.PebblesCrate.server
-import tech.sethi.pebbles.crates.lootcrates.BlacklistConfigManager
-import tech.sethi.pebbles.crates.lootcrates.CrateDataManager
-import java.util.HashMap
 
-class ActiveCrateList(syncId: Int, val player: PlayerEntity) :
-    GenericContainerScreenHandler(ScreenHandlerType.GENERIC_9X6, syncId, player.inventory, SimpleInventory(9 * 6), 6) {
+class ActiveCrateList(syncId: Int, val player: Player) : ChestMenu(MenuType.GENERIC_9x6, syncId, player.inventory, SimpleContainer(9 * 6), 6) {
 
     private val blacklistManager = PebblesCrate.blacklistConfigManager
 
@@ -27,8 +21,7 @@ class ActiveCrateList(syncId: Int, val player: PlayerEntity) :
         initializeInventory()
     }
 
-
-    override fun canUse(player: PlayerEntity): Boolean {
+    override fun stillValid(arg: Player): Boolean {
         return true
     }
 
@@ -37,21 +30,21 @@ class ActiveCrateList(syncId: Int, val player: PlayerEntity) :
         val activeCrates = PebblesCrate.crateDataManager.getCrateData()
         for ((index, crateName) in activeCrates.values.withIndex()) {
             val cratePos = activeCrates.keys.elementAt(index)
-            val blockOnPost = player.world.getBlockState(cratePos).block
-            val crateItem = blockOnPost.asItem().defaultStack
-            crateItem.set(DataComponentTypes.CUSTOM_NAME, crateItem.name.copy().append(" - $crateName"))
+            val blockOnPost = player.level().getBlockState(cratePos).block
+            val crateItem = blockOnPost.asItem().defaultInstance
+            crateItem.set(DataComponents.CUSTOM_NAME, crateItem.displayName.copy().append(" - $crateName"))
             if (!blacklist.contains(cratePos)) {
-                val vanishingEnchant = server!!.worlds.first().registryManager.get(RegistryKeys.ENCHANTMENT)
-                    .get(Enchantments.VANISHING_CURSE)
-                crateItem.addEnchantment(RegistryEntry.of(vanishingEnchant), 1)
+                val vanishingEnchant = server!!.allLevels.first().registryAccess().lookupOrThrow(Registries.ENCHANTMENT)
+                    .getOrThrow(Enchantments.VANISHING_CURSE)
+                crateItem.enchant(vanishingEnchant, 1)
 
             }
-            inventory.setStack(index, crateItem)
+            container.setItem(index, crateItem)
         }
     }
 
-    override fun onSlotClick(slotIndex: Int, button: Int, actionType: SlotActionType?, player: PlayerEntity?) {
-        if (actionType == SlotActionType.THROW || actionType == SlotActionType.CLONE || actionType == SlotActionType.SWAP || actionType == SlotActionType.PICKUP_ALL) {
+    override fun clicked(slotIndex: Int, button: Int, actionType: ClickType, player: Player) {
+        if (actionType == ClickType.THROW || actionType == ClickType.CLONE || actionType == ClickType.SWAP || actionType == ClickType.PICKUP_ALL) {
             return
         }
 
@@ -70,10 +63,10 @@ class ActiveCrateList(syncId: Int, val player: PlayerEntity) :
         }
 
         // close and reopen screen
-        player!!.currentScreenHandler.onClosed(player)
-        player.openHandledScreen(SimpleNamedScreenHandlerFactory({ syncId, _, p ->
+        player!!.containerMenu.removed(player)
+        player.openMenu(SimpleMenuProvider({ syncId, _, p ->
             ActiveCrateList(syncId, p)
-        }, Text.literal("Blacklist Particles")))
+        }, Component.literal("Blacklist Particles")))
 
 
         return

@@ -1,29 +1,29 @@
 package tech.sethi.pebbles.crates.screenhandlers.admin
 
-import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.inventory.SimpleInventory
-import net.minecraft.item.ItemStack
-import net.minecraft.screen.GenericContainerScreenHandler
-import net.minecraft.screen.ScreenHandlerType
-import net.minecraft.screen.slot.Slot
+import net.minecraft.world.SimpleContainer
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.inventory.ChestMenu
+import net.minecraft.world.inventory.MenuType
+import net.minecraft.world.inventory.Slot
+import net.minecraft.world.item.ItemStack
 import java.math.BigDecimal
 
 class IndividualRewardEditingScreenHandler(
         syncId: Int,
-        player: PlayerEntity,
+        player: Player,
         private val crateName: String,
         private val previewItem: ItemStack,
         private val weight: BigDecimal
-) : GenericContainerScreenHandler(ScreenHandlerType.GENERIC_9X1, syncId, player.inventory, SimpleInventory(9), 1) {
+) : ChestMenu(MenuType.GENERIC_9x1, syncId, player.inventory, SimpleContainer(9), 1) {
 
     init {
         // Add slots for the reward items or command rewards
         for (i in 0 until 9) {
-            addSlot(Slot(inventory, i, 8 + i * 18, 18))
+            addSlot(Slot(container, i, 8 + i * 18, 18))
         }
     }
 
-    override fun canUse(player: PlayerEntity): Boolean {
+    override fun stillValid(arg: Player): Boolean {
         return true
     }
 }

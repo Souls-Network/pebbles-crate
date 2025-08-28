@@ -1,13 +1,12 @@
 package tech.sethi.pebbles.crates.util
 
-import net.minecraft.entity.ItemEntity
-import net.minecraft.entity.decoration.ArmorStandEntity
-import net.minecraft.item.ItemStack
-import net.minecraft.util.math.Vec3d
-import net.minecraft.world.World
+import net.minecraft.world.entity.item.ItemEntity
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.Level
+import net.minecraft.world.phys.Vec3
 
 class FloatingPrizeItemEntity(
-    world: World,
+    world: Level,
     x: Double,
     y: Double,
     z: Double,
@@ -17,10 +16,10 @@ class FloatingPrizeItemEntity(
 
     init {
         setNoGravity(true)
-        setPickupDelay(Int.MAX_VALUE)
+        setPickUpDelay(Int.MAX_VALUE)
         isInvisible = false
         isInvulnerable = true
-        velocity = Vec3d.ZERO
+        deltaMovement = Vec3.ZERO
     }
 
     override fun tick() {
@@ -31,5 +30,5 @@ class FloatingPrizeItemEntity(
         }
     }
 
-    override fun shouldSave() = false
+    override fun shouldBeSaved(): Boolean = false
 }

@@ -1,7 +1,6 @@
 package tech.sethi.pebbles.crates.lootcrates
 
-import net.minecraft.util.math.BlockPos
-import tech.sethi.pebbles.crates.PebblesCrate
+import net.minecraft.core.BlockPos
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths

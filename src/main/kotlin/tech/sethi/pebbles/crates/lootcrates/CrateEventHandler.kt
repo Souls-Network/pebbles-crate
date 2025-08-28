@@ -2,26 +2,25 @@ package tech.sethi.pebbles.crates.lootcrates
 
 import com.mojang.brigadier.ParseResults
 import com.mojang.serialization.Dynamic
+import net.minecraft.ChatFormatting
 import net.minecraft.SharedConstants
-import net.minecraft.component.ComponentChanges
-import net.minecraft.component.DataComponentTypes
-import net.minecraft.datafixer.TypeReferences
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NbtCompound
-import net.minecraft.nbt.NbtHelper
-import net.minecraft.nbt.StringNbtReader
-import net.minecraft.registry.Registries
-import net.minecraft.server.command.ServerCommandSource
-import net.minecraft.server.network.ServerPlayerEntity
-import net.minecraft.server.world.ServerWorld
-import net.minecraft.sound.SoundCategory
-import net.minecraft.sound.SoundEvents
-import net.minecraft.text.Text
-import net.minecraft.util.Formatting
-import net.minecraft.util.Identifier
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Vec3d
-import net.minecraft.world.World
+import net.minecraft.commands.CommandSourceStack
+import net.minecraft.core.BlockPos
+import net.minecraft.core.component.DataComponentPatch
+import net.minecraft.core.component.DataComponents
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.TagParser
+import net.minecraft.network.chat.Component
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.sounds.SoundEvents
+import net.minecraft.sounds.SoundSource
+import net.minecraft.util.datafix.fixes.References
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.Level
+import net.minecraft.world.phys.Vec3
 import tech.sethi.pebbles.crates.PebblesCrate
 import tech.sethi.pebbles.crates.PebblesCrate.server
 import tech.sethi.pebbles.crates.particles.CrateParticles
@@ -29,13 +28,12 @@ import tech.sethi.pebbles.crates.util.FloatingPrizeItemEntity
 import tech.sethi.pebbles.crates.util.ParseableMessage
 import tech.sethi.pebbles.crates.util.Task
 import java.util.*
-import java.util.concurrent.*
 
 
 class CrateEventHandler(
-    private val world: World,
+    private val world: Level,
     private val pos: BlockPos,
-    private val player: ServerPlayerEntity,
+    private val player: ServerPlayer,
     private val prizes: List<Prize>,
     private val cratesInUse: MutableSet<BlockPos>,
     private val playerCooldowns: MutableMap<UUID, Long>,
@@ -65,7 +63,7 @@ class CrateEventHandler(
 
 
     private fun spawnFloatingItem(prize: Prize) {
-        if (world is ServerWorld) {
+        if (world is ServerLevel) {
             CrateParticles.rewardParticles(player, pos)
 
             revealPrize(prize, isFinalPrize = true)
@@ -89,50 +87,50 @@ class CrateEventHandler(
         // Remove any previous floating item
         removeFloatingItem()
 
-        val parsedPrize = Registries.ITEM.get(Identifier.tryParse(prize.material))
+        val parsedPrize = BuiltInRegistries.ITEM.get(ResourceLocation.tryParse(prize.material))
         var itemStack = ItemStack(parsedPrize)
 
         if (prize.nbt?.isNotBlank() == true && prize.nbt != "{}" && prize.nbt != "null") {
-                val parsedNbt = StringNbtReader.parse(prize.nbt)
+                val parsedNbt = TagParser.parseTag(prize.nbt)
 
                 val namespacedKeyPattern = Regex("^[a-z0-9_.-]+:[a-z0-9_/.-]+$")
 
-                val isLegacy = parsedNbt.keys.any { !namespacedKeyPattern.matches(it) }
+                val isLegacy = parsedNbt.allKeys.any { !namespacedKeyPattern.matches(it) }
                 if (isLegacy) {
-                    val legacyNbt = NbtCompound().apply {
-                        putString("id", itemStack.registryEntry.idAsString)
+                    val legacyNbt = CompoundTag().apply {
+                        putString("id", itemStack.itemHolder.registeredName)
                         putInt("Count", prize.amount)
                         put("tag", parsedNbt)
                     }
 
-                    val updatedNbt = server?.dataFixer?.update(
-                        TypeReferences.ITEM_STACK,
+                    val updatedNbt = server?.fixerUpper?.update(
+                        References.ITEM_STACK,
                         Dynamic(PebblesCrate.nbtOps, legacyNbt),
                         3700,
-                        SharedConstants.getGameVersion().saveVersion.id
+                        SharedConstants.getCurrentVersion().dataVersion.version
                     )?.value
 
                     itemStack = ItemStack.CODEC.parse(PebblesCrate.nbtOps, updatedNbt).result().orElse(ItemStack.EMPTY)
                 } else {
                     val updatedNbt =
-                        ComponentChanges.CODEC.parse(PebblesCrate.nbtOps, StringNbtReader.parse(prize.nbt)).result()
+                        DataComponentPatch.CODEC.parse(PebblesCrate.nbtOps, TagParser.parseTag(prize.nbt)).result()
                             .orElse(null)
-                    itemStack.applyChanges(updatedNbt)
+                    itemStack.applyComponents(updatedNbt)
                     itemStack.count = prize.amount
                 }
         }
 
-        itemStack.set(DataComponentTypes.CUSTOM_NAME, Text.of(prize.name))
+        itemStack.set(DataComponents.CUSTOM_NAME, Component.literal(prize.name))
 
         var height = pos.y.toDouble()
 
         if (isFinalPrize) {
             height = pos.y + 1.0
         }
-        val spawnPos = Vec3d(pos.x + 0.5, height + 1.5, pos.z + 0.5)
+        val spawnPos = Vec3(pos.x + 0.5, height + 1.5, pos.z + 0.5)
 
         val floatingPrizeItemEntity = FloatingPrizeItemEntity(world, spawnPos.x, spawnPos.y, spawnPos.z, itemStack)
-        world.spawnEntity(floatingPrizeItemEntity)
+        world.addFreshEntity(floatingPrizeItemEntity)
 
         // Store the last spawned floating prize item entity
         synchronized(floatingPrizeItemEntityLock) {
@@ -144,14 +142,15 @@ class CrateEventHandler(
 
 
     fun showPrizesAnimation(finalPrize: Prize) {
-        if (world is ServerWorld) {
+        if (world is ServerLevel) {
             val currentTime = System.currentTimeMillis()
             val lastCrateOpenTime = playerCooldowns[player.uuid] ?: 0L
 
             if (currentTime - lastCrateOpenTime < COOLDOWN_TIME) {
                 val remainingCooldown = (COOLDOWN_TIME - (currentTime - lastCrateOpenTime)) / 1000
-                player.sendMessage(
-                    Text.literal("You can open another crate in $remainingCooldown seconds.").formatted(Formatting.RED),
+                player.displayClientMessage(
+                    Component.literal("You can open another crate in $remainingCooldown seconds.").withStyle(
+                        ChatFormatting.RED),
                     false
                 )
                 return
@@ -177,11 +176,11 @@ class CrateEventHandler(
                 for (command in finalPrize.commands) {
                     val cmd = command.replace("{player_name}", player.name.string)
                     try {
-                        val parseResults: ParseResults<ServerCommandSource> =
-                            player.server.commandManager.dispatcher.parse(cmd, player.server.commandSource)
-                        player.server.commandManager.dispatcher.execute(parseResults)
+                        val parseResults: ParseResults<CommandSourceStack> =
+                            player.server.commands.dispatcher.parse(cmd, player.server.createCommandSourceStack())
+                        player.server.commands.dispatcher.execute(parseResults)
                     } catch (e: Exception) {
-                        player.sendMessage(Text.of("Error executing command: $command"), false)
+                        player.displayClientMessage(Component.literal("Error executing command: $command"), false)
                     }
                 }
             }
@@ -195,7 +194,7 @@ class CrateEventHandler(
     private fun showRandomPrizeRunnable(prize: Prize) = Runnable {
         revealPrize(prize, false)
         world.playSound(
-            null, pos, SoundEvents.BLOCK_NOTE_BLOCK_BANJO.value(), SoundCategory.BLOCKS, 0.5f, 1.0f
+            null, pos, SoundEvents.NOTE_BLOCK_BANJO.value(), SoundSource.BLOCKS, 0.5f, 1.0f
         )
     }
 
@@ -214,8 +213,8 @@ class CrateEventHandler(
 
         if (currentTime - lastCrateOpenTime < COOLDOWN_TIME) {
             val remainingCooldown = (COOLDOWN_TIME - (currentTime - lastCrateOpenTime)) / 1000
-            player.sendMessage(
-                Text.literal("You can open another crate in $remainingCooldown seconds.").formatted(Formatting.RED),
+            player.displayClientMessage(
+                Component.literal("You can open another crate in $remainingCooldown seconds.").withStyle(ChatFormatting.RED),
                 false
             )
             return false
@@ -228,8 +227,8 @@ class CrateEventHandler(
         playerCooldowns[player.uuid] = currentTime
     }
 
-    fun addTask(world: ServerWorld, tickDelay: Long, action: () -> Unit) {
-        val currentTick = world.time
+    fun addTask(world: ServerLevel, tickDelay: Long, action: () -> Unit) {
+        val currentTick = world.gameTime
         val taskTick = currentTick + tickDelay
         val task = Task(world, taskTick, action)
         PebblesCrate.tasks.getOrPut(taskTick) { mutableListOf() }.add(task)

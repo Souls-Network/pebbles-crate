@@ -1,27 +1,27 @@
 package tech.sethi.pebbles.crates.lootcrates
 
 import com.mojang.serialization.Dynamic
+import net.minecraft.ChatFormatting
 import net.minecraft.SharedConstants
-import net.minecraft.component.ComponentChanges
-import net.minecraft.component.DataComponentTypes
-import net.minecraft.component.type.NbtComponent
-import net.minecraft.datafixer.TypeReferences
-import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.item.ItemStack
-import net.minecraft.item.Items
-import net.minecraft.nbt.NbtCompound
-import net.minecraft.nbt.StringNbtReader
-import net.minecraft.registry.Registries
-import net.minecraft.server.network.ServerPlayerEntity
-import net.minecraft.text.Text
-import net.minecraft.util.Formatting
-import net.minecraft.util.Identifier
+import net.minecraft.core.component.DataComponents
+import net.minecraft.core.component.PatchedDataComponentMap
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.TagParser
+import net.minecraft.network.chat.Component
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.util.datafix.fixes.References
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
+import net.minecraft.world.item.component.CustomData
 import tech.sethi.pebbles.crates.PebblesCrate
 import tech.sethi.pebbles.crates.PebblesCrate.server
 import tech.sethi.pebbles.crates.util.ParseableMessage
 import tech.sethi.pebbles.crates.util.setLore
 
-class CrateTransformer(val crateName: String, val player: PlayerEntity) {
+class CrateTransformer(val crateName: String, val player: Player) {
 
     val crateConfig = CrateConfigManager.getCrateConfig(crateName)
 
@@ -29,78 +29,78 @@ class CrateTransformer(val crateName: String, val player: PlayerEntity) {
 
     fun giveTransformer() {
         // create MutableText list with instructions
-        val instructions = mutableListOf<Text>()
+        val instructions = mutableListOf<Component>()
 
         // add instructions to list
-        instructions.add(Text.literal("Right click a chest/enderchest to").formatted(Formatting.GOLD))
-        instructions.add(Text.literal("transform it into a $crateName").formatted(Formatting.GOLD))
+        instructions.add(Component.literal("Right click a chest/enderchest to").withStyle(ChatFormatting.GOLD))
+        instructions.add(Component.literal("transform it into a $crateName").withStyle(ChatFormatting.GOLD))
         setLore(crateItemStack, instructions)
 
-        val nbt = NbtComponent.of(NbtCompound().apply {
+        val nbt = CustomData.of(CompoundTag().apply {
             putString("CrateName", crateName)
         })
-        crateItemStack.set(DataComponentTypes.CUSTOM_DATA, nbt)
-        crateItemStack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(crateName))
+        crateItemStack.set(DataComponents.CUSTOM_DATA, nbt)
+        crateItemStack.set(DataComponents.CUSTOM_NAME, Component.literal(crateName))
 
-        player.sendMessage(Text.literal("Giving $crateName to ${player.name.string}"), false)
+        player.displayClientMessage(Component.literal("Giving $crateName to ${player.name.string}"), false)
 
         server?.execute { ->
-            player.giveItemStack(crateItemStack)
+            player.addItem(crateItemStack)
         }
 
         val message = "Successfully gave $crateName to ${player.name.string}"
-        ParseableMessage(message, player as ServerPlayerEntity, "placeholder").send()
+        ParseableMessage(message, player as ServerPlayer, "placeholder").send()
     }
 
-    fun giveKey(amount: Int = 1, admin: PlayerEntity) {
-        val materialIdentifier = Identifier.tryParse(crateConfig!!.crateKey.material)
+    fun giveKey(amount: Int = 1, admin: Player) {
+        val materialIdentifier = ResourceLocation.tryParse(crateConfig!!.crateKey.material)
         if (materialIdentifier != null) {
-            val item = Registries.ITEM.get(materialIdentifier)
+            val item = BuiltInRegistries.ITEM.get(materialIdentifier)
             if (item != Items.AIR) {
                 var crateKeyItemStack = ItemStack(item, amount)
                 val parsedName = ParseableMessage(
-                    crateConfig.crateKey.name, player as ServerPlayerEntity, "placeholder"
+                    crateConfig.crateKey.name, player as ServerPlayer, "placeholder"
                 ).returnMessageAsStyledText()
 
                 if (!crateConfig.crateKey.nbt.isNullOrEmpty() && crateConfig.crateKey.nbt != "{}") {
-                    val parsedNbt = StringNbtReader.parse(crateConfig.crateKey.nbt)
+                    val parsedNbt = TagParser.parseTag(crateConfig.crateKey.nbt)
 
                     val namespacedKeyPattern = Regex("^[a-z0-9_.-]+:[a-z0-9_/.-]+$")
 
-                    val isLegacy = parsedNbt.keys.any { !namespacedKeyPattern.matches(it) }
+                    val isLegacy = parsedNbt.allKeys.any { !namespacedKeyPattern.matches(it) }
                     if (isLegacy) {
-                        val legacyNbt = NbtCompound().apply {
-                            putString("id", crateKeyItemStack.registryEntry.idAsString)
+                        val legacyNbt = CompoundTag().apply {
+                            putString("id", crateKeyItemStack.itemHolder.registeredName)
                             putInt("Count", amount)
                             put("tag", parsedNbt)
                         }
 
-                        val updatedNbt = server?.dataFixer?.update(
-                            TypeReferences.ITEM_STACK,
+                        val updatedNbt = server?.fixerUpper?.update(
+                            References.ITEM_STACK,
                             Dynamic(PebblesCrate.nbtOps, legacyNbt),
                             3700,
-                            SharedConstants.getGameVersion().saveVersion.id
+                            SharedConstants.getCurrentVersion().dataVersion.version
                         )?.value
 
                         crateKeyItemStack = ItemStack.CODEC.parse(PebblesCrate.nbtOps, updatedNbt).result().orElse(ItemStack.EMPTY)
                     } else {
                         val updatedNbt =
-                            ComponentChanges.CODEC.parse(PebblesCrate.nbtOps, StringNbtReader.parse(crateConfig.crateKey.nbt)).result()
+                            PatchedDataComponentMap.CODEC.parse(PebblesCrate.nbtOps, TagParser.parseTag(crateConfig.crateKey.nbt)).result()
                                 .orElse(null)
-                        crateKeyItemStack.applyChanges(updatedNbt)
+                        crateKeyItemStack.applyComponents(updatedNbt)
                         crateKeyItemStack.count = amount
                     }
                 }
 
-                val nbtCompound = crateKeyItemStack.get(DataComponentTypes.CUSTOM_DATA)?.copyNbt()?.apply {
+                val nbtCompound = crateKeyItemStack.get(DataComponents.CUSTOM_DATA)?.copyTag()?.apply {
                     putString("CrateName", crateConfig.crateName)
-                } ?: NbtCompound().apply {
+                } ?: CompoundTag().apply {
                     putString("CrateName", crateConfig.crateName)
                 }
 
-                crateKeyItemStack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(nbtCompound))
+                crateKeyItemStack.set(DataComponents.CUSTOM_DATA, CustomData.of(nbtCompound))
 
-                crateKeyItemStack.set(DataComponentTypes.CUSTOM_NAME, parsedName)
+                crateKeyItemStack.set(DataComponents.CUSTOM_NAME, parsedName)
                 // Set the lore for the crate key item
                 val crateKeyLore = crateConfig.crateKey.lore
                 val parsedCrateKeyLore = crateKeyLore.map {
@@ -109,7 +109,7 @@ class CrateTransformer(val crateName: String, val player: PlayerEntity) {
                 setLore(crateKeyItemStack, parsedCrateKeyLore)
 
                 server?.execute { ->
-                    player.inventory.offerOrDrop(crateKeyItemStack)
+                    player.inventory.placeItemBackInInventory(crateKeyItemStack)
                 }
 
                 val message = "You received $amount ${crateConfig.crateKey.name} for ${crateConfig.crateName}!"

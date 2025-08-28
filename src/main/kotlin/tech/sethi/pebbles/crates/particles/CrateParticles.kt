@@ -1,12 +1,12 @@
 package tech.sethi.pebbles.crates.particles
 
-import net.minecraft.network.packet.s2c.play.ParticleS2CPacket
-import net.minecraft.particle.ParticleTypes
-import net.minecraft.server.network.ServerPlayerEntity
-import net.minecraft.server.world.ServerWorld
-import net.minecraft.sound.SoundCategory
-import net.minecraft.sound.SoundEvents
-import net.minecraft.util.math.BlockPos
+import net.minecraft.core.BlockPos
+import net.minecraft.core.particles.ParticleTypes
+import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.sounds.SoundEvents
+import net.minecraft.sounds.SoundSource
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -21,7 +21,7 @@ object CrateParticles {
         stepX++
     }
 
-    fun spawnSpiralParticles(player: ServerPlayerEntity, pos: BlockPos, world: ServerWorld) {
+    fun spawnSpiralParticles(player: ServerPlayer, pos: BlockPos, world: ServerLevel) {
         for (stepY in 0 until 60 step (120 / particles)) {
             val dx = -(cos(((stepX + stepY) / particlesPerRotation.toDouble()) * Math.PI * 2)) * radius
             val dy = stepY / particlesPerRotation.toDouble() / 2.0
@@ -31,14 +31,14 @@ object CrateParticles {
             val y = pos.y + 0.5 + dy
             val z = pos.z + 0.5 + dz
 
-            val particlePacket = ParticleS2CPacket(
+            val particlePacket = ClientboundLevelParticlesPacket(
                 ParticleTypes.SOUL_FIRE_FLAME, false, x, y, z, 0.0f, 0.0f, 0.0f, 0.0f, 1
             )
-            player.networkHandler.sendPacket(particlePacket)
+            player.connection.send(particlePacket)
         }
     }
 
-    fun spawnCrossSpiralsParticles(player: ServerPlayerEntity, pos: BlockPos, world: ServerWorld) {
+    fun spawnCrossSpiralsParticles(player: ServerPlayer, pos: BlockPos, world: ServerLevel) {
         for (stepY in 0 until 60 step (120 / particles)) {
             val dx = -(cos(((stepX + stepY) / particlesPerRotation.toDouble()) * Math.PI * 2)) * radius
             val dy = stepY / particlesPerRotation.toDouble() / 2.0
@@ -48,22 +48,22 @@ object CrateParticles {
             val y = pos.y + 1.5 + dy
             val z = pos.z + 0.5 + dz
 
-            val particlePacket = ParticleS2CPacket(
+            val particlePacket = ClientboundLevelParticlesPacket(
                 ParticleTypes.FIREWORK, false, x, y, z, 0.0f, 0.0f, 0.0f, 0.0f, 1
             )
-            player.networkHandler.sendPacket(particlePacket)
+            player.connection.send(particlePacket)
         }
     }
 
-    fun rewardParticles(player: ServerPlayerEntity, pos: BlockPos) {
-        val world = player.world
+    fun rewardParticles(player: ServerPlayer, pos: BlockPos) {
+        val world = player.level()
 
         for (i in 0 until 5) {
             world.playSound(
-                null as ServerPlayerEntity?, pos, SoundEvents.ENTITY_ALLAY_DEATH, SoundCategory.BLOCKS, 0.5f, 0.5f
+                null as ServerPlayer?, pos, SoundEvents.ALLAY_DEATH, SoundSource.BLOCKS, 0.5f, 0.5f
             )
             world.playSound(
-                null as ServerPlayerEntity?, pos, SoundEvents.BLOCK_NOTE_BLOCK_BELL.value(), SoundCategory.BLOCKS, 0.5f, 1f
+                null as ServerPlayer?, pos, SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.BLOCKS, 0.5f, 1f
             )
         }
 
@@ -71,7 +71,7 @@ object CrateParticles {
         val offsetY = 0.2
         val offsetZ = 0.5
 
-        val particlePacket = ParticleS2CPacket(
+        val particlePacket = ClientboundLevelParticlesPacket(
             ParticleTypes.SCULK_SOUL,
             false,
             pos.x + offsetX,
@@ -83,9 +83,9 @@ object CrateParticles {
             0.1f,
             50
         )
-        player.networkHandler.sendPacket(particlePacket)
+        player.connection.send(particlePacket)
 
-        player.networkHandler.sendPacket(particlePacket)
+        player.connection.send(particlePacket)
 
     }
 }

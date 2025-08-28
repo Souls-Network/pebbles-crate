@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.8-SNAPSHOT'
+    id 'dev.architectury.loom' version '1.10-SNAPSHOT'
     id "org.jetbrains.kotlin.jvm" version "2.0.21"
 }
 
@@ -12,15 +12,20 @@ group = project.maven_group
 
 repositories {
     mavenCentral()
+    maven {
+        name = "NeoForged"
+        url = "https://maven.neoforged.net/releases"
+    }
+    maven {
+        name = "kotlinforforge"
+        url = "https://thedarkcolour.github.io/KotlinForForge/"
+    }
 }
 
 loom {
-    splitEnvironmentSourceSets()
-
     mods {
         modid {
             sourceSet sourceSets.main
-            sourceSet sourceSets.client
         }
     }
 
@@ -28,18 +33,21 @@ loom {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    mappings loom.officialMojangMappings()
 
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-    modImplementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
-
+    neoForge("net.neoforged:neoforge:21.1.192")
+//    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+//
+//    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+//    modImplementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
+//
+    modImplementation("thedarkcolour:kotlinforforge-neoforge:5.9.0")
 
     implementation 'net.kyori:adventure-text-serializer-legacy:4.17.0'
-    implementation 'net.kyori:adventure-platform-fabric:5.14.2'
+    modImplementation 'net.kyori:adventure-platform-neoforge:6.0.1'
     implementation "net.kyori:adventure-api:4.17.0"
 
-    include 'net.kyori:adventure-platform-fabric:5.14.2'
+    include 'net.kyori:adventure-platform-neoforge:6.0.1'
     include 'net.kyori:adventure-text-serializer-legacy:4.17.0'
     include "net.kyori:adventure-api:4.17.0"
 
@@ -49,7 +57,7 @@ dependencies {
 processResources {
     inputs.property "version", project.version
 
-    filesMatching("fabric.mod.json") {
+    filesMatching("neoforge.mods.toml") {
         expand "version": project.version
     }
 }

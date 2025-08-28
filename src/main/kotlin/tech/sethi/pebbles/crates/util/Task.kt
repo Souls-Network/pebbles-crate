@@ -1,5 +1,5 @@
 package tech.sethi.pebbles.crates.util
 
-import net.minecraft.server.world.ServerWorld
+import net.minecraft.server.level.ServerLevel
 
-data class Task(val world: ServerWorld, val tick: Long, val action: () -> Unit)
+data class Task(val world: ServerLevel, val tick: Long, val action: () -> Unit)

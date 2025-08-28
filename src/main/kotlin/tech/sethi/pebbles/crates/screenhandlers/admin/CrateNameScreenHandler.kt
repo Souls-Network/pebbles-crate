@@ -1,31 +1,32 @@
 package tech.sethi.pebbles.crates.screenhandlers.admin
 
-import net.minecraft.component.DataComponentTypes
-import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.inventory.SimpleInventory
-import net.minecraft.item.ItemStack
-import net.minecraft.item.Items
-import net.minecraft.screen.GenericContainerScreenHandler
-import net.minecraft.screen.ScreenHandlerType
-import net.minecraft.screen.SimpleNamedScreenHandlerFactory
-import net.minecraft.screen.slot.Slot
-import net.minecraft.screen.slot.SlotActionType
-import net.minecraft.text.Text
+import net.minecraft.core.component.DataComponents
+import net.minecraft.network.chat.Component
+import net.minecraft.world.MenuProvider
+import net.minecraft.world.SimpleContainer
+import net.minecraft.world.SimpleMenuProvider
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.inventory.ChestMenu
+import net.minecraft.world.inventory.ClickType
+import net.minecraft.world.inventory.MenuType
+import net.minecraft.world.inventory.Slot
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
 import tech.sethi.pebbles.crates.lootcrates.CrateConfigManager
 
-class CrateNameScreenHandler(syncId: Int, private val player: PlayerEntity) : GenericContainerScreenHandler(
-    ScreenHandlerType.GENERIC_9X1, syncId, player.inventory, SimpleInventory(9), 1
+class CrateNameScreenHandler(syncId: Int, private val player: Player) : ChestMenu(
+    MenuType.GENERIC_9x1, syncId, player.inventory, SimpleContainer(9), 1
 ) {
 
     init {
-        val inventory = inventory
+        val inventory = container
         val crateConfigManager = CrateConfigManager
 
         // Fill the inventory with paper with modified name
         for (i in 1 until 9) {
             val paper = ItemStack(Items.PAPER)
-            paper.set(DataComponentTypes.CUSTOM_NAME, Text.of("Add item to empty slot to name crate"))
-            inventory.setStack(i, paper)
+            paper.set(DataComponents.CUSTOM_NAME, Component.literal("Add item to empty slot to name crate"))
+            inventory.setItem(i, paper)
         }
         val existingCrates = crateConfigManager.loadCrateConfigs()
 
@@ -33,27 +34,26 @@ class CrateNameScreenHandler(syncId: Int, private val player: PlayerEntity) : Ge
         addSlot(Slot(inventory, 0, 8, 18))
     }
 
-
-    override fun canUse(player: PlayerEntity): Boolean {
+    override fun stillValid(arg: Player): Boolean {
         return true
     }
 
-    override fun onSlotClick(slotIndex: Int, clickData: Int, actionType: SlotActionType, player: PlayerEntity) {
-        if (slotIndex == 0 && inventory.getStack(0).item == Items.NAME_TAG) {
-            val crateName = inventory.getStack(0).name.string
+    override fun clicked(slotIndex: Int, clickData: Int, actionType: ClickType, player: Player) {
+        if (slotIndex == 0 && container.getItem(0).item == Items.NAME_TAG) {
+            val crateName = container.getItem(0).displayName.string
             // Check if the crate name is already taken
             val existingCrates = CrateConfigManager.loadCrateConfigs()
             for (crateConfig in existingCrates) {
                 if (crateConfig.crateName == crateName) {
-                    player.sendMessage(Text.of("Crate name already taken"), false)
+                    player.displayClientMessage(Component.literal("Crate name already taken"), false)
                     return
                 }
             }
-            player.openHandledScreen(SimpleNamedScreenHandlerFactory({ syncId, _, p ->
+            player.openMenu(SimpleMenuProvider({ syncId, _, p ->
                 PreviewIconScreenHandler(syncId, p, crateName)
-            }, Text.of("Loot Icon Editor")))
+            }, Component.literal("Loot Icon Editor")))
         } else {
-            super.onSlotClick(slotIndex, clickData, actionType, player)
+            super.clicked(slotIndex, clickData, actionType, player)
         }
     }
 

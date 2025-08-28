@@ -1,14 +1,11 @@
 package tech.sethi.pebbles.crates.util
 
-import net.minecraft.component.DataComponentTypes
-import net.minecraft.component.type.LoreComponent
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NbtList
-import net.minecraft.nbt.NbtString
-import net.minecraft.text.MutableText
-import net.minecraft.text.Text
+import net.minecraft.core.component.DataComponents
+import net.minecraft.network.chat.Component
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.component.ItemLore
 
-fun setLore(itemStack: ItemStack, lore: List<Text>) {
-    val loreComponent = LoreComponent(lore)
-    itemStack.set(DataComponentTypes.LORE, loreComponent)
+fun setLore(itemStack: ItemStack, lore: List<Component>) {
+    val loreComponent = ItemLore(lore)
+    itemStack.set(DataComponents.LORE, loreComponent)
 }

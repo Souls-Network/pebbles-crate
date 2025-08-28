@@ -1,18 +1,19 @@
 package tech.sethi.pebbles.crates.util
 
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.minecraft.server.MinecraftServer
+import net.neoforged.neoforge.event.tick.ServerTickEvent
 import tech.sethi.pebbles.crates.PebblesCrate
+import thedarkcolour.kotlinforforge.neoforge.forge.FORGE_BUS
 
-class TickHandler {
-    init {
-        ServerTickEvents.START_SERVER_TICK.register(ServerTickEvents.StartTick {
-            processTasks(it)
-        })
+object TickHandler {
+    fun init() {
+        FORGE_BUS.addListener<ServerTickEvent.Pre>() {
+            processTasks(it.server)
+        }
     }
 
     private fun processTasks(server: MinecraftServer) {
-        val currentTick = server.worlds.first().time
+        val currentTick = server.allLevels.first().gameTime
 
         PebblesCrate.tasks[currentTick]?.let { tasks ->
             for (task in tasks) {

@@ -1,30 +1,30 @@
 package tech.sethi.pebbles.crates
 
-import net.fabricmc.api.ModInitializer
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
-import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents
-import net.fabricmc.fabric.api.event.player.UseBlockCallback
-import net.minecraft.component.DataComponentTypes
-import net.minecraft.component.type.NbtComponent
-import net.minecraft.item.ItemStack
-import net.minecraft.item.Items
-import net.minecraft.nbt.NbtCompound
-import net.minecraft.nbt.NbtElement
+import net.minecraft.ChatFormatting
+import net.minecraft.core.BlockPos
+import net.minecraft.core.component.DataComponents
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtOps
-import net.minecraft.registry.Registries
-import net.minecraft.registry.RegistryOps
+import net.minecraft.nbt.Tag
+import net.minecraft.network.chat.Component
+import net.minecraft.resources.RegistryOps
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.MinecraftServer
-import net.minecraft.server.network.ServerPlayerEntity
-import net.minecraft.server.world.ServerWorld
-import net.minecraft.text.Text
-import net.minecraft.util.ActionResult
-import net.minecraft.util.Formatting
-import net.minecraft.util.Hand
-import net.minecraft.util.Identifier
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Vec3d
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.InteractionResult
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
+import net.minecraft.world.item.component.CustomData
+import net.minecraft.world.phys.Vec3
+import net.neoforged.fml.common.Mod
+import net.neoforged.neoforge.event.RegisterCommandsEvent
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent
+import net.neoforged.neoforge.event.level.BlockEvent
+import net.neoforged.neoforge.event.server.ServerStartingEvent
+import net.neoforged.neoforge.event.tick.ServerTickEvent
 import org.slf4j.LoggerFactory
 import tech.sethi.pebbles.crates.lootcrates.BlacklistConfigManager
 import tech.sethi.pebbles.crates.lootcrates.CrateConfigManager
@@ -33,10 +33,13 @@ import tech.sethi.pebbles.crates.lootcrates.CrateEventHandler
 import tech.sethi.pebbles.crates.particles.CrateParticles
 import tech.sethi.pebbles.crates.screenhandlers.PrizeDisplayScreenHandlerFactory
 import tech.sethi.pebbles.crates.util.*
-import tech.sethi.pebbleslootcrate.commands.CrateCommand
+import tech.sethi.pebbles.crates.commands.CrateCommand
+import thedarkcolour.kotlinforforge.neoforge.forge.FORGE_BUS
+import thedarkcolour.kotlinforforge.neoforge.forge.MOD_BUS
 import java.util.*
 
-object PebblesCrate : ModInitializer {
+@Mod(PebblesCrate.MOD_ID)
+object PebblesCrate {
     private val logger = LoggerFactory.getLogger("pebbles-crates")
     const val MOD_ID = "pebbles_crate"
     val cratesInUse = Collections.synchronizedSet(mutableSetOf<BlockPos>())
@@ -46,23 +49,30 @@ object PebblesCrate : ModInitializer {
     val blacklistConfigManager: BlacklistConfigManager = BlacklistConfigManager()
     var server: MinecraftServer? = null
 
-    var nbtOps: RegistryOps<NbtElement>? = null
+    var nbtOps: RegistryOps<Tag>? = null
 
-    override fun onInitialize() {
+    init {
         logger.info("Initializing Pebbles Loot Crates!")
 
         //create /config/pebbles-crate/crates if it doesn't exist
         CrateConfigManager.createCratesFolder()
 
-        TickHandler()
+        var bus = MOD_BUS
 
-        CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
-            CrateCommand.register(dispatcher)
+        TickHandler.init()
+
+        bus.addListener<RegisterCommandsEvent> {
+            CrateCommand.register(it.dispatcher)
         }
 
-        UseBlockCallback.EVENT.register(UseBlockCallback { player, world, hand, hitResult ->
-            if (world.isClient || hand != Hand.MAIN_HAND) {
-                return@UseBlockCallback ActionResult.PASS
+        FORGE_BUS.addListener<PlayerInteractEvent.RightClickBlock> { event ->
+            val player = event.entity;
+            val world = event.level
+            val hand = event.hand
+            val hitResult = event.hitVec
+
+            if (world.isClientSide || hand != InteractionHand.MAIN_HAND) {
+                return@addListener
             }
 
             val savedCrateData = crateDataManager.getCrateData()
@@ -76,39 +86,41 @@ object PebblesCrate : ModInitializer {
                     crateName = crateConfig.screenName
                 }
 
-                val parsedKey = Registries.ITEM.get(
-                    Identifier.tryParse(
+                val parsedKey = BuiltInRegistries.ITEM.get(
+                    ResourceLocation.tryParse(
                         crateConfig?.crateKey?.material ?: "minecraft:gold_nugget"
                     )
                 )
                 val parseKeyStack = ItemStack(parsedKey)
-                val crateKeyLore = crateConfig?.crateKey?.lore?.map { Text.of(it) }
+                val crateKeyLore = crateConfig?.crateKey?.lore?.map(Component::literal)
                 if (crateKeyLore != null) {
                     setLore(parseKeyStack, crateKeyLore)
                 }
                 if (crateConfig != null) {
-                    val nbt = NbtComponent.of(NbtCompound().apply { putString("CrateName", crateName) })
-                    parseKeyStack.set(DataComponentTypes.CUSTOM_DATA, nbt)
+                    val nbt = CustomData.of(CompoundTag().apply { putString("CrateName", crateName) })
+                    parseKeyStack.set(DataComponents.CUSTOM_DATA, nbt)
                 }
 
                 if (crateConfig != null) {
-                    val heldStack = player.mainHandStack
-                    val heldStackNbt = heldStack.get(DataComponentTypes.CUSTOM_DATA)?.copyNbt()
+                    val heldStack = player.mainHandItem
+                    val heldStackNbt = heldStack.get(DataComponents.CUSTOM_DATA)?.copyTag()
                     if (heldStack.item == parseKeyStack.item && heldStackNbt != null && heldStackNbt.getString(
                             "CrateName"
                         ) == crateConfig.crateName
                     ) {
                         if (cratesInUse.contains(hitResult.blockPos)) {
-                            player.sendMessage(
-                                Text.literal("Someone is already using this crate!").formatted(Formatting.RED), false
+                            player.displayClientMessage(
+                                Component.literal("Someone is already using this crate!").withStyle(ChatFormatting.RED), false
                             )
-                            return@UseBlockCallback ActionResult.SUCCESS
+
+                            event.cancellationResult = InteractionResult.SUCCESS
+                            return@addListener
                         }
 
                         val crateEventHandler = CrateEventHandler(
                             world,
                             hitResult.blockPos,
-                            player as ServerPlayerEntity,
+                            player as ServerPlayer,
                             crateConfig.prize,
                             cratesInUse,
                             playerCooldowns,
@@ -116,7 +128,7 @@ object PebblesCrate : ModInitializer {
                         )
 
                         if (crateEventHandler.canOpenCrate()) {
-                            heldStack.decrement(1)
+                            heldStack.shrink(1)
                             val finalPrize = crateEventHandler.weightedRandomSelection(crateConfig.prize)
                             crateEventHandler.showPrizesAnimation(finalPrize)
                             crateEventHandler.updatePlayerCooldown()
@@ -126,41 +138,47 @@ object PebblesCrate : ModInitializer {
                         // Floating item will be spawned in the CrateEventHandler's init block
                     } else {
                         // Open crate preview GUI
-                        player.openHandledScreen(
+                        player.openMenu(
                             PrizeDisplayScreenHandlerFactory(
                                 ParseableName("$crateName").returnMessageAsStyledText(), crateConfig
                             )
                         )
                     }
-                    return@UseBlockCallback ActionResult.SUCCESS
+
+                    event.cancellationResult = InteractionResult.SUCCESS
+                    return@addListener
                 }
             } else {
                 // Assign a new crate if the player is holding a named paper
-                val heldStack = player.mainHandStack
-                if (heldStack.item == Items.PAPER && heldStack.componentChanges.get(DataComponentTypes.CUSTOM_NAME) != null && heldStack.get(
-                        DataComponentTypes.CUSTOM_DATA
-                    )?.nbt?.contains(
-                        "CrateName"
-                    ) == true
-                ) {
-                    val crateName = heldStack.get(DataComponentTypes.CUSTOM_DATA)?.nbt?.getString("CrateName")
-                        ?: return@UseBlockCallback ActionResult.PASS
+                val heldStack = player.mainHandItem
+                if (heldStack.item == Items.PAPER && heldStack.componentsPatch.get(DataComponents.CUSTOM_NAME) != null && heldStack.get(
+                        DataComponents.CUSTOM_DATA)?.copyTag()?.contains("CrateName") == true) {
+                    val crateName = heldStack.get(DataComponents.CUSTOM_DATA)?.copyTag()?.getString("CrateName")
+
+                    if(crateName == null) {
+                        event.cancellationResult = InteractionResult.PASS
+                        return@addListener
+                    }
                     savedCrateData[hitResult.blockPos] = crateName
                     crateDataManager.saveCrateData(savedCrateData)
 
-                    player.sendMessage(
-                        Text.literal("Assigned a $crateName crate to the block at ${hitResult.blockPos}")
-                            .formatted(Formatting.GRAY), false
+                    player.displayClientMessage(
+                        Component.literal("Assigned a $crateName crate to the block at ${hitResult.blockPos}")
+                            .withStyle(ChatFormatting.GRAY), false
                     )
-                    return@UseBlockCallback ActionResult.SUCCESS
+
+                    event.cancellationResult = InteractionResult.SUCCESS
+
+                    return@addListener
                 }
             }
 
-            ActionResult.PASS
-        })
+        }
 
+        FORGE_BUS.addListener<BlockEvent.BreakEvent> { event ->
+            val player = event.player
+            val pos = event.pos
 
-        PlayerBlockBreakEvents.AFTER.register(PlayerBlockBreakEvents.After { _, player, pos, _, _ ->
             // Load the saved crate data
             val savedCrateData = crateDataManager.getCrateData()
 
@@ -171,28 +189,28 @@ object PebblesCrate : ModInitializer {
                 crateDataManager.saveCrateData(savedCrateData)
 
                 // Send a message to the player for debugging purposes
-                player.sendMessage(
-                    Text.literal("Crate data removed for position: $pos").formatted(Formatting.GRAY), false
+                player.displayClientMessage(
+                    Component.literal("Crate data removed for position: $pos").withStyle(ChatFormatting.GRAY), false
                 )
             }
-        })
+        }
 
-        ServerTickEvents.END_SERVER_TICK.register(ServerTickEvents.EndTick { server ->
-            for (world in server.worlds) {
-                if (world is ServerWorld) {
+        FORGE_BUS.addListener<ServerTickEvent.Post> {
+            for (world in it.server.allLevels) {
+                if (world is ServerLevel) {
                     spawnParticlesForAllCrates(world)
                 }
             }
             CrateParticles.updateTimers()
-        })
+        }
 
-        ServerLifecycleEvents.SERVER_STARTING.register { server ->
-            this.server = server
-            nbtOps = server!!.registryManager.getOps(NbtOps.INSTANCE)
+        bus.addListener<ServerStartingEvent> {
+            this.server = it.server
+            nbtOps = server!!.registryAccess().createSerializationContext(NbtOps.INSTANCE)
         }
     }
 
-    private fun spawnParticlesForAllCrates(world: ServerWorld) {
+    private fun spawnParticlesForAllCrates(world: ServerLevel) {
         val savedCrateData = crateDataManager.getCrateData()
         val blacklist = blacklistConfigManager.getBlacklist()
 
@@ -200,7 +218,7 @@ object PebblesCrate : ModInitializer {
             // Skip crates in the blacklist
             if (pos in blacklist) continue
 
-            if (world.isChunkLoaded(pos.x shr 4, pos.z shr 4)){
+            if (world.hasChunkAt(pos.x shr 4, pos.z shr 4)){
                 val playersNearby =
                     world.getPlayersByDistance(pos, 16.0) // Only get players within 16 blocks of the crate block
                 for (player in playersNearby) {
@@ -211,10 +229,10 @@ object PebblesCrate : ModInitializer {
     }
 
 
-    private fun ServerWorld.getPlayersByDistance(pos: BlockPos, distance: Double): List<ServerPlayerEntity> {
-        return this.players.filter { player ->
-            player.squaredDistanceTo(
-                Vec3d(
+    private fun ServerLevel.getPlayersByDistance(pos: BlockPos, distance: Double): List<ServerPlayer> {
+        return this.players().filter { player ->
+            player.distanceToSqr(
+                Vec3(
                     pos.x + 0.5, pos.y + 0.5, pos.z + 0.5
                 )
             ) <= distance * distance

@@ -3,7 +3,7 @@ package tech.sethi.pebbles.crates.lootcrates
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
-import net.minecraft.util.math.BlockPos
+import net.minecraft.core.BlockPos
 import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
@@ -31,7 +31,7 @@ class CrateDataManager {
             FileReader(CRATE_DATA_FILE).use { reader ->
                 val rawCrateData = GSON.fromJson<Map<String, String>>(reader, CRATE_DATA_TYPE) ?: return crateData
                 for ((key, value) in rawCrateData) {
-                    val pos = BlockPos.fromLong(key.toLong())
+                    val pos = BlockPos.of(key.toLong())
                     crateData[pos] = value
                 }
             }

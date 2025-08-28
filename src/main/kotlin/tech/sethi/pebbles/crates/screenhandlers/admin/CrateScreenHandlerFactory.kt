@@ -1,45 +1,43 @@
 package tech.sethi.pebbles.crates.screenhandlers.admin
 
-import net.minecraft.component.DataComponentTypes
-import net.minecraft.component.type.LoreComponent
-import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.entity.player.PlayerInventory
-import net.minecraft.inventory.SimpleInventory
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NbtList
-import net.minecraft.nbt.NbtString
-import net.minecraft.registry.Registries
-import net.minecraft.screen.NamedScreenHandlerFactory
-import net.minecraft.screen.ScreenHandler
-import net.minecraft.screen.slot.Slot
-import net.minecraft.text.Text
-import net.minecraft.util.Identifier
+import net.minecraft.core.component.DataComponents
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.network.chat.Component
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.MenuProvider
+import net.minecraft.world.SimpleContainer
+import net.minecraft.world.entity.player.Inventory
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.inventory.AbstractContainerMenu
+import net.minecraft.world.inventory.Slot
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.component.ItemLore
 import tech.sethi.pebbles.crates.lootcrates.CrateConfig
 
-class CrateScreenHandlerFactory(private val crateConfig: CrateConfig) : NamedScreenHandlerFactory {
-    override fun createMenu(syncId: Int, inv: PlayerInventory, player: PlayerEntity): ScreenHandler {
+class CrateScreenHandlerFactory(private val crateConfig: CrateConfig) : MenuProvider {
+    override fun createMenu(syncId: Int, inv: Inventory, player: Player): AbstractContainerMenu {
         // Create and return the screen handler for the crate interface
         // You will implement this in the next step
         return CrateScreenHandler(syncId, inv, crateConfig)
     }
 
-    override fun getDisplayName(): Text {
-        return Text.of(crateConfig.crateName)
+    override fun getDisplayName(): Component {
+        return Component.literal(crateConfig.crateName)
     }
 }
 
 class CrateScreenHandler(
     syncId: Int,
-    private val playerInventory: PlayerInventory,
+    private val playerInventory: Inventory,
     private val crateConfig: CrateConfig
-) : ScreenHandler(null, syncId) {
+) : AbstractContainerMenu(null, syncId) {
 
-    private val inventory: SimpleInventory
+    private val inventory: SimpleContainer
 
     init {
         val rows = 6
         val columns = 9
-        inventory = SimpleInventory(columns * rows)
+        inventory = SimpleContainer(columns * rows)
 
         // Populate the inventory with the prizes and their chances
         // You will implement this in the next step
@@ -81,23 +79,23 @@ class CrateScreenHandler(
         val prizes = crateConfig.prize
         for ((index, prize) in prizes.withIndex()) {
             // Add the prize item to the inventory with its chance as lore
-            val itemStack = ItemStack(Registries.ITEM.get(Identifier.tryParse(prize.material)))
-            setLore(itemStack, listOf(Text.of("Chance: ${prize.chance}")))
-            inventory.setStack(index, itemStack)
+            val itemStack = ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.tryParse(prize.material)))
+            setLore(itemStack, listOf(Component.literal("Chance: ${prize.chance}")))
+            inventory.setItem(index, itemStack)
         }
     }
 
-    override fun canUse(player: PlayerEntity): Boolean {
+    override fun stillValid(arg: Player): Boolean {
         return true
     }
 
-    override fun quickMove(player: PlayerEntity, index: Int): ItemStack {
+    override fun quickMoveStack(player: Player, index: Int): ItemStack {
         return ItemStack.EMPTY
     }
 
-    private fun setLore(itemStack: ItemStack, lore: List<Text>) {
-        val loreComponent = LoreComponent(lore)
-        itemStack.set(DataComponentTypes.LORE, loreComponent)
+    private fun setLore(itemStack: ItemStack, lore: List<Component>) {
+        val loreComponent = ItemLore(lore)
+        itemStack.set(DataComponents.LORE, loreComponent)
     }
 }
 
