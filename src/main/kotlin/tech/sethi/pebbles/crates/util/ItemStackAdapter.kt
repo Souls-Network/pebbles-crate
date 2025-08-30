@@ -1,3 +1,5 @@
+package tech.sethi.pebbles.crates.util
+
 import com.google.gson.*
 import com.mojang.serialization.Dynamic
 import net.minecraft.SharedConstants

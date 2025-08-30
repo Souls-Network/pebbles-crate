@@ -13,8 +13,9 @@ import net.minecraft.world.inventory.Slot
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import tech.sethi.pebbles.crates.lootcrates.CrateConfigManager
+import tech.sethi.pebbles.crates.screenhandlers.GenericChestMenu
 
-class CrateNameScreenHandler(syncId: Int, private val player: Player) : ChestMenu(
+class CrateNameScreenHandler(syncId: Int, private val player: Player) : GenericChestMenu(
     MenuType.GENERIC_9x1, syncId, player.inventory, SimpleContainer(9), 1
 ) {
 

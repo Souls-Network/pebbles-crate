@@ -26,6 +26,7 @@ import net.neoforged.neoforge.event.level.BlockEvent
 import net.neoforged.neoforge.event.server.ServerStartingEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import org.slf4j.LoggerFactory
+import org.spongepowered.api.Sponge
 import tech.sethi.pebbles.crates.lootcrates.BlacklistConfigManager
 import tech.sethi.pebbles.crates.lootcrates.CrateConfigManager
 import tech.sethi.pebbles.crates.lootcrates.CrateDataManager
@@ -34,6 +35,7 @@ import tech.sethi.pebbles.crates.particles.CrateParticles
 import tech.sethi.pebbles.crates.screenhandlers.PrizeDisplayScreenHandlerFactory
 import tech.sethi.pebbles.crates.util.*
 import tech.sethi.pebbles.crates.commands.CrateCommand
+import tech.sethi.pebbles.crates.screenhandlers.PrizeDisplay
 import thedarkcolour.kotlinforforge.neoforge.forge.FORGE_BUS
 import thedarkcolour.kotlinforforge.neoforge.forge.MOD_BUS
 import java.util.*
@@ -61,7 +63,7 @@ object PebblesCrate {
 
         TickHandler.init()
 
-        bus.addListener<RegisterCommandsEvent> {
+        FORGE_BUS.addListener<RegisterCommandsEvent> {
             CrateCommand.register(it.dispatcher)
         }
 
@@ -114,6 +116,7 @@ object PebblesCrate {
                             )
 
                             event.cancellationResult = InteractionResult.SUCCESS
+                            event.isCanceled = true
                             return@addListener
                         }
 
@@ -138,14 +141,20 @@ object PebblesCrate {
                         // Floating item will be spawned in the CrateEventHandler's init block
                     } else {
                         // Open crate preview GUI
-                        player.openMenu(
-                            PrizeDisplayScreenHandlerFactory(
-                                ParseableName("$crateName").returnMessageAsStyledText(), crateConfig
-                            )
-                        )
+
+                        logger.info("crateName: $crateName")
+                        var name = ParseableName(crateName)
+                        logger.info("ParseableName(crateName): $name")
+                        var name1 = name.returnMessageAsStyledText()
+                        logger.info("name.returnMessageAsStyledText(): $name1")
+                        logger.info("crateConfig: $crateConfig")
+                        logger.info("player: $player")
+
+                        PrizeDisplay.open(ParseableName(crateName).returnMessageAsStyledText(), crateConfig, player)
                     }
 
                     event.cancellationResult = InteractionResult.SUCCESS
+                    event.isCanceled = true
                     return@addListener
                 }
             } else {
@@ -168,7 +177,7 @@ object PebblesCrate {
                     )
 
                     event.cancellationResult = InteractionResult.SUCCESS
-
+                    event.isCanceled = true
                     return@addListener
                 }
             }
@@ -204,7 +213,7 @@ object PebblesCrate {
             CrateParticles.updateTimers()
         }
 
-        bus.addListener<ServerStartingEvent> {
+        FORGE_BUS.addListener<ServerStartingEvent> {
             this.server = it.server
             nbtOps = server!!.registryAccess().createSerializationContext(NbtOps.INSTANCE)
         }

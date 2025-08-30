@@ -12,8 +12,9 @@ import net.minecraft.world.inventory.MenuType
 import net.minecraft.world.item.enchantment.Enchantments
 import tech.sethi.pebbles.crates.PebblesCrate
 import tech.sethi.pebbles.crates.PebblesCrate.server
+import tech.sethi.pebbles.crates.screenhandlers.GenericChestMenu
 
-class ActiveCrateList(syncId: Int, val player: Player) : ChestMenu(MenuType.GENERIC_9x6, syncId, player.inventory, SimpleContainer(9 * 6), 6) {
+class ActiveCrateList(syncId: Int, val player: Player) : GenericChestMenu(MenuType.GENERIC_9x6, syncId, player.inventory, SimpleContainer(9 * 6), 6) {
 
     private val blacklistManager = PebblesCrate.blacklistConfigManager
 

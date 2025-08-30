@@ -1,5 +1,7 @@
 package tech.sethi.pebbles.crates.screenhandlers
 
+import ca.landonjw.gooeylibs2.api.page.GooeyPage
+import ca.landonjw.gooeylibs2.api.page.LinkedPage
 import com.mojang.serialization.Dynamic
 import net.minecraft.SharedConstants
 import net.minecraft.core.component.DataComponentPatch
@@ -34,7 +36,7 @@ class PrizeDisplayScreenHandlerFactory(private val title: Component, private val
         var currentPage = 0
 
         val crateItems = crateConfig.prize
-        val handler = object : ChestMenu(
+        val handler = object : GenericChestMenu(
             MenuType.GENERIC_9x6, syncId, inv, CrateInventory(crateItems, currentPage), 6
         ) {
             override fun clicked(slotNumber: Int, button: Int, action: ClickType, playerEntity: Player

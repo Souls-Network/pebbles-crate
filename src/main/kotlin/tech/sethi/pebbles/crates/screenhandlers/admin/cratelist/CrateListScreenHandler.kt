@@ -11,11 +11,12 @@ import net.minecraft.world.inventory.MenuType
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import tech.sethi.pebbles.crates.lootcrates.CrateConfigManager
+import tech.sethi.pebbles.crates.screenhandlers.GenericChestMenu
 import tech.sethi.pebbles.crates.screenhandlers.admin.crateconfig.CrateConfigScreenHandler
 import tech.sethi.pebbles.crates.util.ParseableName
 
 class CrateListScreenHandler(syncId: Int, player: Player) :
-    ChestMenu(MenuType.GENERIC_9x6, syncId, player.inventory, SimpleContainer(9 * 6), 6) {
+    GenericChestMenu(MenuType.GENERIC_9x6, syncId, player.inventory, SimpleContainer(9 * 6), 6) {
 
     private val crateConfigManager = CrateConfigManager
 

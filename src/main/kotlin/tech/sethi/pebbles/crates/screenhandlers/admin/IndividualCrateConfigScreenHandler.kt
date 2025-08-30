@@ -14,9 +14,10 @@ import net.minecraft.world.item.Items
 import net.minecraft.world.item.component.CustomData
 import net.minecraft.world.item.component.ItemLore
 import tech.sethi.pebbles.crates.lootcrates.CrateConfigManager
+import tech.sethi.pebbles.crates.screenhandlers.GenericChestMenu
 
 class IndividualCrateConfigScreenHandler(syncId: Int, private val player: Player, private val crateName: String) :
-    ChestMenu(
+    GenericChestMenu(
         MenuType.GENERIC_9x6, syncId, player.inventory, SimpleContainer(9 * 6), 6
     ) {
 

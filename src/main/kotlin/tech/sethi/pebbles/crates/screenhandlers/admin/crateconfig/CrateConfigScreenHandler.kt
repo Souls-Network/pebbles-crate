@@ -15,11 +15,12 @@ import net.minecraft.world.item.Items
 import net.neoforged.neoforge.server.permission.PermissionAPI
 import tech.sethi.pebbles.crates.lootcrates.CrateConfigManager
 import tech.sethi.pebbles.crates.lootcrates.CrateTransformer
+import tech.sethi.pebbles.crates.screenhandlers.GenericChestMenu
 import tech.sethi.pebbles.crates.screenhandlers.admin.cratelist.CrateListScreenHandler
 
 class CrateConfigScreenHandler(
     syncId: Int, player: Player, crateName: String
-) : ChestMenu(MenuType.GENERIC_9x3, syncId, player.inventory, SimpleContainer(9 * 3), 3) {
+) : GenericChestMenu(MenuType.GENERIC_9x3, syncId, player.inventory, SimpleContainer(9 * 3), 3) {
 
     init {
         val inventory = container

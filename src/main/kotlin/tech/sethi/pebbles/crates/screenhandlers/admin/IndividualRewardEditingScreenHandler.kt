@@ -6,6 +6,7 @@ import net.minecraft.world.inventory.ChestMenu
 import net.minecraft.world.inventory.MenuType
 import net.minecraft.world.inventory.Slot
 import net.minecraft.world.item.ItemStack
+import tech.sethi.pebbles.crates.screenhandlers.GenericChestMenu
 import java.math.BigDecimal
 
 class IndividualRewardEditingScreenHandler(
@@ -14,7 +15,7 @@ class IndividualRewardEditingScreenHandler(
         private val crateName: String,
         private val previewItem: ItemStack,
         private val weight: BigDecimal
-) : ChestMenu(MenuType.GENERIC_9x1, syncId, player.inventory, SimpleContainer(9), 1) {
+) : GenericChestMenu(MenuType.GENERIC_9x1, syncId, player.inventory, SimpleContainer(9), 1) {
 
     init {
         // Add slots for the reward items or command rewards

@@ -19,11 +19,12 @@ import net.minecraft.world.item.component.ItemLore
 import tech.sethi.pebbles.crates.lootcrates.CrateConfig
 import tech.sethi.pebbles.crates.lootcrates.CrateConfigManager
 import tech.sethi.pebbles.crates.lootcrates.Prize
+import tech.sethi.pebbles.crates.screenhandlers.GenericChestMenu
 import java.math.BigDecimal
 
 class PreviewIconScreenHandler(
     syncId: Int, player: Player, private val crateName: String
-) : ChestMenu(MenuType.GENERIC_9x3, syncId, player.inventory, SimpleContainer(9 * 3), 3) {
+) : GenericChestMenu(MenuType.GENERIC_9x3, syncId, player.inventory, SimpleContainer(9 * 3), 3) {
 
     private val oddsSumItem = ItemStack(Items.PAPER)
     private val crateConfigManager = CrateConfigManager

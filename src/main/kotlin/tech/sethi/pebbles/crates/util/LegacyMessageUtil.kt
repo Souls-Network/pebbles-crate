@@ -1,7 +1,6 @@
 package tech.sethi.pebbles.crates.util
 
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.platform.modcommon.MinecraftServerAudiences
 import net.kyori.adventure.text.JoinConfiguration
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer
@@ -9,6 +8,7 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.minecraft.core.RegistryAccess
 import net.minecraft.network.chat.MutableComponent
 import net.minecraft.server.level.ServerPlayer
+import org.spongepowered.api.Sponge
 
 fun parse(text: String, vararg placeholders: Any): Component {
     val legecySerializer = LegacyComponentSerializer.legacyAmpersand()
@@ -42,14 +42,12 @@ class ParseableMessage(
 ) {
     fun sendToAll() {
         val component = parseMessageWithStyles(message, prizeName)
-        val serverAudiences = MinecraftServerAudiences.of(player!!.server)
-        serverAudiences.all().sendMessage(component)
+        Sponge.server().broadcastAudience().sendMessage(component)
     }
 
     fun send() {
         val component = parseMessageWithStyles(message, prizeName)
-        val serverAudiences = MinecraftServerAudiences.of(player!!.server)
-        serverAudiences.player(player.uuid).sendMessage(component)
+        (player!! as org.spongepowered.api.entity.living.player.server.ServerPlayer).sendMessage(component)
     }
 
     fun returnMessageAsStyledText(): net.minecraft.network.chat.Component {
